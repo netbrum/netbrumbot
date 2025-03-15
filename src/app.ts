@@ -16,4 +16,17 @@ export default (app: Probot) => {
 
     context.octokit.issues.createComment(response);
   })
+
+  app.on("check_suite.completed", async (context) => {
+    if (context.payload.check_suite.conclusion !== "success") return;
+
+    const pr = context.payload.check_suite.pull_requests[0];
+
+    // TODO: Portainer stuff...
+
+    context.octokit.issues.createComment(context.issue({
+      issue_number: pr.number,
+      body: getResponse("PREVIEW").replace("%(host)", "[127.0.0.1:3030](http://127.0.0.1:3030)")
+    }))
+  });
 };
