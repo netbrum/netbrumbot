@@ -5,7 +5,6 @@ import { getLog } from "./helpers/get-log.js";
 
 type AdditionalOptions = {
   Octokit?: typeof ProbotOctokit;
-  githubToken?: string
   log?: Logger;
 };
 
