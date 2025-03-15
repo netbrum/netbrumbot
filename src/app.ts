@@ -1,5 +1,6 @@
 import { Probot } from "probot";
-import { getCommand, getResponse } from "./command.js";
+import { getCommand } from "./command.js";
+import { getResponse } from "./response.js";
 
 export const BOT_MENTION = "@netbrum ";
 
@@ -13,6 +14,6 @@ export default (app: Probot) => {
     const command = getCommand(comment);
     const response = context.issue({ body: getResponse(command) });
 
-    return context.octokit.issues.createComment(response);
+    context.octokit.issues.createComment(response);
   })
 };
