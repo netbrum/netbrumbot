@@ -1,3 +1,5 @@
 services:
   nginx:
     image: nginx:1-alpine
+    ports:
+      - "80"
