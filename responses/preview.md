@@ -1,1 +1,1 @@
-Preview environment ready on %(host)
+Preview environment ready on $HOST

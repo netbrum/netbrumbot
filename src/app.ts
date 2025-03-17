@@ -26,25 +26,44 @@ export default (app: Probot) => {
   app.on("check_suite.completed", async (context) => {
     if (context.payload.check_suite.conclusion !== "success") return;
 
-    const checkSuitePr = context.payload.check_suite.pull_requests[0];
+    const checkSuitePullRequest = context.payload.check_suite.pull_requests[0];
 
-    if (!checkSuitePr) return;
+    if (!checkSuitePullRequest) return;
 
-    const pr = await context.octokit.pulls.get({
+    const pullRequest = await context.octokit.pulls.get({
       ...context.issue(),
-      pull_number: checkSuitePr.number
+      pull_number: checkSuitePullRequest.number
     });
 
-    const [host, port] = await portainer.setupPreview(pr as PullRequest, context.payload.repository);
+    try {
+      const [host, port] = await portainer.setupPreview(pullRequest as PullRequest, context.payload.repository);
 
-    context.octokit.issues.createComment(context.issue({
-      issue_number: pr.data.number,
-      body: getResponse("PREVIEW").replace("%(host)", `[${host}:${port}](http://${host}:${port})`)
-    }))
+      context.octokit.issues.createComment(context.issue({
+        issue_number: pullRequest.data.number,
+        body: getResponse("PREVIEW").replace("$HOST", `[${host}:${port}](http://${host}:${port})`)
+      }))
+    } catch (error) {
+      if (!(error instanceof Error)) return;
+
+      context.octokit.issues.createComment(context.issue({
+        issue_number: pullRequest.data.number,
+        body: getResponse("PREVIEW_SETUP_ERROR").replace("$ERROR", error.message)
+      }))
+    }
   });
 
   app.on("pull_request.closed", async (context) => {
     const pullRequest = context.payload.pull_request;
-    await portainer.closePreview(pullRequest.node_id);
+
+    try {
+      await portainer.deletePreview(pullRequest.node_id);
+    } catch (error) {
+      if (!(error instanceof Error)) return;
+
+      context.octokit.issues.createComment(context.issue({
+        issue_number: pullRequest.number,
+        body: getResponse("PREVIEW_DELETE_ERROR").replace("$ERROR", error.message)
+      }))
+    }
   });
 };

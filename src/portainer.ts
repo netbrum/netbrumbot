@@ -48,14 +48,22 @@ export class PortainerClient {
     //
     // We just filter it ourselves.
     const response = await this.request("GET", "/stacks");
-    const stacks: Stack[] = await response.json();
+    const data = await response.json();
 
-    return stacks.filter((stack) => stack.EndpointId == this.endpointId);
+    if (!response.ok) {
+      throw new Error(data.message);
+    }
+
+    return (data as Stack[]).filter((stack) => stack.EndpointId == this.endpointId);
   }
 
-  async deleteStack(stackId: number): Promise<boolean> {
+  async deleteStack(stackId: number) {
     const response = await this.request("DELETE", `/stacks/${stackId}?endpointId=${this.endpointId}`);
-    return response.ok;
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message);
+    }
   }
 
   async createStack(pullRequest: PullRequest, repository: Repository): Promise<CreateStack> {
@@ -70,30 +78,36 @@ export class PortainerClient {
       swarmID: this.swarmId
     });
 
-    return await response.json();
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message);
+    }
+
+    return data;
   }
 
   async getStackServices(prNodeId: string): Promise<Service[]> {
     const response = await this.request("GET", `/endpoints/${this.endpointId}/docker/services`);
-    const services: Service[] = await response.json();
+    const data = await response.json();
 
-    return services.filter((service) => {
+    if (!response.ok) {
+      throw new Error(data.message);
+    }
+
+    return (data as Service[]).filter((service) => {
       return service.Spec.Labels["com.docker.stack.namespace"] === prNodeId
     });
   }
 
   /**
-  * Closes all stacks matching the pull request node id.
+  * Deletes all stacks matching the pull request node id.
   */
-  async closePreview(prNodeId: string): Promise<void> {
+  async deletePreview(prNodeId: string): Promise<void> {
     const stacks = (await this.getStacks()).filter((stack) => stack.Name === prNodeId);
 
     for (const stack of stacks) {
-      const success = await this.deleteStack(stack.Id);
-
-      if (!success) {
-        throw new Error(`Error deleting stack ${stack.Name} (ID: ${stack.Id})`)
-      }
+      await this.deleteStack(stack.Id);
     }
   }
 
@@ -101,7 +115,7 @@ export class PortainerClient {
   * Returns the host and port for the newly created stack.
   */
   async setupPreview(pullRequest: PullRequest, repository: Repository): Promise<[string, number]> {
-    await this.closePreview(pullRequest.data.node_id);
+    await this.deletePreview(pullRequest.data.node_id);
 
     // Portainer does not like deleting and creating a stack with
     // the same name immediately.
