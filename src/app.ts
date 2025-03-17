@@ -42,4 +42,9 @@ export default (app: Probot) => {
       body: getResponse("PREVIEW").replace("%(host)", `[${host}:${port}](http://${host}:${port})`)
     }))
   });
+
+  app.on("pull_request.closed", async (context) => {
+    const pullRequest = context.payload.pull_request;
+    await portainer.closePreview(pullRequest.node_id);
+  });
 };
