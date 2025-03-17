@@ -1,10 +1,13 @@
 import { Probot } from "probot";
 import { getCommand } from "./command.js";
 import { getResponse } from "./response.js";
+// import { PortainerClient } from "./portainer.js";
 
 export const BOT_MENTION = "@netbrum ";
 
 export default (app: Probot) => {
+  // const portainer = new PortainerClient();
+
   app.on("issue_comment.created", async (context) => {
     const comment = context.payload.comment.body;
     const isPr = context.payload.issue.pull_request;
@@ -22,7 +25,9 @@ export default (app: Probot) => {
 
     const pr = context.payload.check_suite.pull_requests[0];
 
-    // TODO: Portainer stuff...
+    console.log(context.payload.check_suite.node_id);
+
+    // const [host,port] = await portainer.setupPreview(context.payload.check_suite.node_id);
 
     context.octokit.issues.createComment(context.issue({
       issue_number: pr.number,

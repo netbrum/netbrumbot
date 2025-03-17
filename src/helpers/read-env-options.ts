@@ -32,8 +32,12 @@ export function readEnvOptions(env = process.env) {
     baseUrl: env.GHE_HOST
       ? `${env.GHE_PROTOCOL || "https"}://${env.GHE_HOST}/api/v3`
       : "https://api.github.com",
-    githubToken: env["GITHUB_TOKEN"],
-    clientId: env["GITHUB_CLIENT_ID"],
-    clientSecret: env["GITHUB_CLIENT_SECRET"],
+    githubToken: env.GITHUB_TOKEN,
+    clientId: env.GITHUB_CLIENT_ID,
+    clientSecret: env.GITHUB_CLIENT_SECRET,
+    portainerHost: env.PORTAINER_HOST,
+    portainerAccessToken: env.PORTAINER_ACCESS_TOKEN,
+    portainerEndpontId: Number(env.PORTAINER_ENDPOINT_ID),
+    portainerSwarmId: env.PORTAINER_SWARM_ID
   };
 }

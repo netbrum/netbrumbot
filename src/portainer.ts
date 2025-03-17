@@ -1,5 +1,5 @@
-// const HOST = "http://192.168.20.100:9000"
-// const ENDPOINT_ID = 1;
+import { readEnvOptions } from "./helpers/read-env-options.js";
+import { CreateStack, Stack, Service } from "./portainer-types/index.js";
 
 type Method = "GET" | "POST" | "DELETE";
 
@@ -9,32 +9,24 @@ export class PortainerClient {
   endpointId: number
   swarmId: string
 
-  constructor(token: string, host: string, endpointId: number, swarmId: string) {
-    this.token = token;
-    this.host = host;
-    this.endpointId = endpointId;
-    this.swarmId = swarmId;
-  }
+  constructor() {
+    const { portainerAccessToken, portainerHost, portainerEndpontId, portainerSwarmId } = readEnvOptions();
 
-  static async getToken(host: string, username: string, password: string): Promise<string> {
-    const response = await fetch(`${host}/api/auth`, {
-      method: "POST",
-      body: JSON.stringify({
-        username,
-        password
-      })
-    });
+    if (!portainerAccessToken || !portainerHost || !portainerEndpontId || !portainerSwarmId) {
+      throw new Error("Missing portainer environment variables");
+    }
 
-    const { jwt } = await response.json();
-
-    return jwt;
+    this.token = portainerAccessToken;
+    this.host = portainerHost;
+    this.endpointId = portainerEndpontId;
+    this.swarmId = portainerSwarmId;
   }
 
   async request(method: Method, endpoint: string, body?: object): Promise<Response> {
     const response = await fetch(`${this.host}/api${endpoint}`, {
       method,
       headers: {
-        Authorization: `Bearer ${this.token}`
+        "X-API-Key": this.token
       },
       body: JSON.stringify(body)
     });
@@ -42,23 +34,28 @@ export class PortainerClient {
     return response;
   }
 
-  async getStacks(): Promise<any[]> {
+  async getEndpointIp(): Promise<string> {
+    const response = await this.request("GET", `/endpoints/${this.endpointId}`);
+    return (await response.json()).PublicURL;
+  }
+
+  async getStacks(): Promise<Stack[]> {
     // The EndpointID filter parameter seemingly does not work with swarm stacks..?
     // https://github.com/portainer/portainer/blob/e1f9b69cd562538e46ce2d7d5a4a32851007f37e/api/http/handler/stacks/stack_list.go#L126-L135
     //
     // We just filter it ourselves.
     const response = await this.request("GET", "/stacks");
-    const stacks: any[] = await response.json();
+    const stacks: Stack[] = await response.json();
 
-    return stacks.filter((stack) => stack.EndpointId === this.endpointId);
+    return stacks.filter((stack) => stack.EndpointId == this.endpointId);
   }
 
   async deleteStack(stackId: number): Promise<boolean> {
-    const response = await this.request("DELETE", `stacks/${stackId}?endpointId=${this.endpointId}`);
+    const response = await this.request("DELETE", `/stacks/${stackId}?endpointId=${this.endpointId}`);
     return response.ok;
   }
 
-  async createStack(prNodeId: string) {
+  async createStack(prNodeId: string): Promise<CreateStack> {
     const response = await this.request("POST", `/stacks/create/swarm/repository?endpointId=${this.endpointId}`, {
       fromAppTemplate: false,
       name: prNodeId,
@@ -70,10 +67,53 @@ export class PortainerClient {
       swarmID: this.swarmId
     });
 
-    console.log(response);
+    return await response.json();
+  }
 
-    const body = await response.json();
+  async getStackServices(prNodeId: string): Promise<Service[]> {
+    const response = await this.request("GET", `/endpoints/${this.endpointId}/docker/services`);
+    const services: Service[] = await response.json();
 
-    console.log(body);
+    return services.filter((service) => {
+      return service.Spec.Labels["com.docker.stack.namespace"] === prNodeId
+    });
+  }
+
+  /**
+  * Closes all stacks matching the pull request node id.
+  */
+  async closePreview(prNodeId: string): Promise<void> {
+    const stacks = (await this.getStacks()).filter((stack) => stack.Name === prNodeId);
+
+    for (const stack of stacks) {
+      const success = await this.deleteStack(stack.Id);
+
+      if (!success) {
+        throw new Error(`Error deleting stack ${stack.Name} (ID: ${stack.Id})`)
+      }
+    }
+  }
+
+  /**
+  * Returns the host and port for the newly created stack.
+  */
+  async setupPreview(prNodeId: string): Promise<[string, number]> {
+    await this.closePreview(prNodeId);
+    const createStack = await this.createStack(prNodeId);
+
+    const stackServices = await this.getStackServices(prNodeId);
+
+    if (stackServices.length === 0) {
+      throw new Error(`No services found for stack ${createStack.Name} (ID: ${createStack.Id})`);
+    }
+
+    const host = await this.getEndpointIp();
+    const ports = stackServices[0].Endpoint.Ports;
+
+    if (ports.length === 0) {
+      throw new Error(`No ports found for service ${stackServices[0].Spec.Name} (ID: ${stackServices[0].ID})`);
+    }
+
+    return [host, ports[0].PublishedPort];
   }
 }
