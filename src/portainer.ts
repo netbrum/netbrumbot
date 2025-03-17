@@ -1,4 +1,4 @@
-import { PullRequest } from "./app.js";
+import { PullRequest } from "./probot-types.js";
 import { readEnvOptions } from "./helpers/read-env-options.js";
 import { CreateStack, Stack, Service } from "./portainer-types/index.js";
 import type { Repository } from "@octokit/webhooks-types"
@@ -95,25 +95,26 @@ export class PortainerClient {
       throw new Error(data.message);
     }
 
+    // Portainer stack names are *always* transformed to lowercase.
+    const nodeId = prNodeId.toLowerCase();
+
     return (data as Service[]).filter((service) => {
-      return service.Spec.Labels["com.docker.stack.namespace"] === prNodeId
+      // Portainer stack names are *always* transformed to lowercase.
+      return service.Spec.Labels["com.docker.stack.namespace"] === nodeId
     });
   }
 
-  /**
-  * Deletes all stacks matching the pull request node id.
-  */
   async deletePreview(prNodeId: string): Promise<void> {
-    const stacks = (await this.getStacks()).filter((stack) => stack.Name === prNodeId);
+    // Portainer stack names are *always* transformed to lowercase.
+    const nodeId = prNodeId.toLowerCase();
+
+    const stacks = (await this.getStacks()).filter((stack) => stack.Name === nodeId);
 
     for (const stack of stacks) {
       await this.deleteStack(stack.Id);
     }
   }
 
-  /**
-  * Returns the host and port for the newly created stack.
-  */
   async setupPreview(pullRequest: PullRequest, repository: Repository): Promise<[string, number]> {
     await this.deletePreview(pullRequest.data.node_id);
 

@@ -2,6 +2,7 @@ import { BOT_MENTION } from "./app.js";
 
 export enum Command {
   HELP = "HELP",
+  RETRY = "RETRY",
   UNKNOWN = "UNKNOWN"
 }
 

@@ -6,6 +6,7 @@ export const RESPONSES = {
   HELP: "help.md",
   UNKNOWN: "unknown.md",
   PREVIEW: "preview.md",
+  RETRY: "preview.md",
   PREVIEW_SETUP_ERROR: "preview-setup-error.md",
   PREVIEW_DELETE_ERROR: "preview-delete-error.md"
 } as const;
