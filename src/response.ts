@@ -1,19 +1,20 @@
 import fs from "fs"
 import { Command } from "./command.js";
+import path from "path";
 
 export const RESPONSES = {
-  HELP: "../responses/help.md",
-  UNKNOWN: "../responses/unknown.md",
-  PREVIEW: "../responses/preview.md",
-  PREVIEW_SETUP_ERROR: "../responses/preview-setup-error.md",
-  PREVIEW_DELETE_ERROR: "../responses/preview-delete-error.md"
+  HELP: "help.md",
+  UNKNOWN: "unknown.md",
+  PREVIEW: "preview.md",
+  PREVIEW_SETUP_ERROR: "preview-setup-error.md",
+  PREVIEW_DELETE_ERROR: "preview-delete-error.md"
 } as const;
 
 export type ResponseKey = keyof typeof RESPONSES;
 
 function getResponseFilePath(key: ResponseKey) {
   const dirname = import.meta.dirname;
-  return `${dirname}/${RESPONSES[key]}}`;
+  return path.join(dirname, "/../responses/", RESPONSES[key]);
 }
 
 export function getResponse(key: ResponseKey | Command): string {
