@@ -1,12 +1,15 @@
 import { Probot } from "probot";
 import { getCommand } from "./command.js";
 import { getResponse } from "./response.js";
-// import { PortainerClient } from "./portainer.js";
+import { PortainerClient } from "./portainer.js";
+import type { Endpoints } from "@octokit/types";
+
+export type PullRequest = Endpoints["GET /repos/{owner}/{repo}/pulls/{pull_number}"]["response"];
 
 export const BOT_MENTION = "@netbrum ";
 
 export default (app: Probot) => {
-  // const portainer = new PortainerClient();
+  const portainer = new PortainerClient();
 
   app.on("issue_comment.created", async (context) => {
     const comment = context.payload.comment.body;
@@ -23,15 +26,20 @@ export default (app: Probot) => {
   app.on("check_suite.completed", async (context) => {
     if (context.payload.check_suite.conclusion !== "success") return;
 
-    const pr = context.payload.check_suite.pull_requests[0];
+    const checkSuitePr = context.payload.check_suite.pull_requests[0];
 
-    console.log(context.payload.check_suite.node_id);
+    if (!checkSuitePr) return;
 
-    // const [host,port] = await portainer.setupPreview(context.payload.check_suite.node_id);
+    const pr = await context.octokit.pulls.get({
+      ...context.issue(),
+      pull_number: checkSuitePr.number
+    });
+
+    const [host, port] = await portainer.setupPreview(pr as PullRequest, context.payload.repository);
 
     context.octokit.issues.createComment(context.issue({
-      issue_number: pr.number,
-      body: getResponse("PREVIEW").replace("%(host)", "[127.0.0.1:3030](http://127.0.0.1:3030)")
+      issue_number: pr.data.number,
+      body: getResponse("PREVIEW").replace("%(host)", `[${host}:${port}](http://${host}:${port})`)
     }))
   });
 };

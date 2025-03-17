@@ -1,5 +1,8 @@
+import { PullRequest } from "./app.js";
 import { readEnvOptions } from "./helpers/read-env-options.js";
 import { CreateStack, Stack, Service } from "./portainer-types/index.js";
+import type { Repository } from "@octokit/webhooks-types"
+
 
 type Method = "GET" | "POST" | "DELETE";
 
@@ -55,14 +58,14 @@ export class PortainerClient {
     return response.ok;
   }
 
-  async createStack(prNodeId: string): Promise<CreateStack> {
+  async createStack(pullRequest: PullRequest, repository: Repository): Promise<CreateStack> {
     const response = await this.request("POST", `/stacks/create/swarm/repository?endpointId=${this.endpointId}`, {
       fromAppTemplate: false,
-      name: prNodeId,
+      name: pullRequest.data.node_id,
       repositoryAuthentication: false,
       repositoryReferenceName: "refs/heads/main",
-      repositoryURL: "https://github.com/netbrum/netbrumbot",
-      composeFile: "docker-compose.yml",
+      repositoryURL: repository.html_url,
+      composeFile: "testing.yml",
       tlsskipVerify: false,
       swarmID: this.swarmId
     });
@@ -97,11 +100,15 @@ export class PortainerClient {
   /**
   * Returns the host and port for the newly created stack.
   */
-  async setupPreview(prNodeId: string): Promise<[string, number]> {
-    await this.closePreview(prNodeId);
-    const createStack = await this.createStack(prNodeId);
+  async setupPreview(pullRequest: PullRequest, repository: Repository): Promise<[string, number]> {
+    await this.closePreview(pullRequest.data.node_id);
 
-    const stackServices = await this.getStackServices(prNodeId);
+    // Portainer does not like deleting and creating a stack with
+    // the same name immediately.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+
+    const createStack = await this.createStack(pullRequest, repository);
+    const stackServices = await this.getStackServices(createStack.Name);
 
     if (stackServices.length === 0) {
       throw new Error(`No services found for stack ${createStack.Name} (ID: ${createStack.Id})`);
